@@ -65,17 +65,17 @@ def palm4msa(params):
     for i in range(params.n_facts):
         cons = params.cons[i]
         if cons[0] == 'sp':
-            handles_cell[i] = lambda x: prox_sp(x, cons[1], device)
+            handles_cell[i] = lambda x: prox_sp(x, cons[1])
         elif cons[0] == 'spcol':
-            handles_cell[i] = lambda x: prox_spcol(x, cons[1], device)
+            handles_cell[i] = lambda x: prox_spcol(x, cons[1])
         elif cons[0] == 'splin':
-            handles_cell[i] = lambda x: prox_splin(x, cons[1], device)
+            handles_cell[i] = lambda x: prox_splin(x, cons[1])
         elif cons[0] == 'normcol':
-            handles_cell[i] = lambda x: prox_normcol(x, cons[1], device)
+            handles_cell[i] = lambda x: prox_normcol(x, cons[1])
         elif cons[0] == 'const':
             handles_cell[i] = lambda x: cons[1]
         elif cons[0] == 'sppos':
-            handles_cell[i] = lambda x: prox_sp_pos(x, cons[1], device)
+            handles_cell[i] = lambda x: prox_sp_pos(x, cons[1])
         else:
             raise Exception('The expressed type of constraint is not known')
     
@@ -116,6 +116,6 @@ def palm4msa(params):
         lambda_ = torch.trace(mult_right(X.T, facts)) / torch.trace(mult_right(dvp(facts).T, facts))
 
         if verbose:
-            rmse = torch.linalg.norm(X - lambda_*dvp(facts), 'fro') / math.sqrt(X.numel()).item()
+            rmse = torch.linalg.norm(X - lambda_*dvp(facts), 'fro') / math.sqrt(X.numel())
             print(f'Iter {i}, RMSE={rmse}')
     return lambda_, facts
