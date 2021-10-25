@@ -28,7 +28,7 @@ def main():
         n_iter=200,
         n_facts=2,
         data=X,
-        verbose=1,
+        verbose=args.verbose,
         update_way=0,
         cons=cons,
         init_facts=init_facts,
@@ -45,5 +45,6 @@ def main():
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--gpu', action='store_true', help='Use gpu if available')
+    parser.add_argument('--verbose', action='store_true', help='Verbose')
     args = parser.parse_args()
     main()

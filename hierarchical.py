@@ -61,12 +61,13 @@ def hierarchical(params):
     verbose = params.get('verbose', 0)
     update_way = params.get('update_way', 0)
     fact_side = params.get('fact_side', 0)
-    is_gpu = params.get('gpu', False)
+    is_gpu = params.get('is_gpu', False)
     if is_gpu and torch.cuda.is_available():
         device = 'cuda'
     else:
         device = 'cpu'
 
+    print('is_gpu', is_gpu)
     # Verify the validity of the constraints
     verif_size = params.data.size(0) == params.cons[0][0][2] and params.cons[0][0][3] \
         == params.cons[1][0][2] and params.data.size(1) == params.cons[1][0][3]
@@ -89,7 +90,8 @@ def hierarchical(params):
     lambda_ = 1
     facts = [[]] * params.n_facts
     Res = params.data.to(device)
-    errors = torch.zeros(params.n_facts-1, 2)
+    params.data = params.to(device)
+    errors = torch.zeros(params.n_facts-1, 2).to(device)
 
     for k in range(0, params.n_facts-1):
         cons = [params.cons[0][k], params.cons[1][k]]
@@ -147,6 +149,6 @@ def hierarchical(params):
         else:
             Res = facts3[k+1]
         
-        errors[k, 0] = torch.linalg.norm(params.data - lambda_ * dvp(facts3)) / torch.linalg.norm(params.data)
+        errors[k, 0] = torch.linalg.norm(params.data - lambda_ * dvp(facts3, device=device)) / torch.linalg.norm(params.data)
         errors[k, 1] = nnzero_count(facts3) / params.data.numel()
     return lambda_, facts, errors

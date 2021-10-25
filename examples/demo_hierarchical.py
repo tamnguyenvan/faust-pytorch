@@ -31,18 +31,19 @@ def main():
         cons=cons,
         n_iter1=200,
         n_iter2=200,
-        verbose=0,
+        verbose=args.verbose,
         is_gpu=is_gpu,
     )
 
     lambda_, facts, errors = hierarchical(params)
     print('lambda', lambda_)
-    print('facts', dvp(facts))
+    print('X_recon', dvp(facts, device='cuda' if is_gpu else 'cpu'))
     print('errors', errors)
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--gpu', action='store_true', help='Use gpu if available')
+    parser.add_argument('--verbose', action='store_true', help='Verbose')
     args = parser.parse_args()
     main()

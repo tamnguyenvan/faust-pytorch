@@ -86,7 +86,8 @@ def palm4msa(params):
         if torch.is_tensor(fact):
             facts[i] = fact.to(device)
     
-    X = params.data.to(device)
+    params.data = params.data.to(device)
+    X = params.data
     if update_way:
         maj = reversed(range(params.n_facts))
     else:
@@ -102,7 +103,7 @@ def palm4msa(params):
                 if torch.isreal(X).all():
                     grad, LC = grad_comp(L, facts[j], R, params.data, lambda_, device)
                 else:
-                    grad, LC = grad_comp_cpx(L, facts[j], R, params.data, lambda_, device)
+                    grad, LC = grad_comp_cpx(L, facts[j], R, params, lambda_, device)
 
                 c = LC * 1.001
                 cons = params.cons[j]
@@ -113,9 +114,9 @@ def palm4msa(params):
                 else:
                     facts[j] = handles_cell[j](facts[j] - (1/c)*grad)
         
-        lambda_ = torch.trace(mult_right(X.T, facts)) / torch.trace(mult_right(dvp(facts).T, facts))
+        lambda_ = torch.trace(mult_right(X.T, facts)) / torch.trace(mult_right(dvp(facts, device=device).T, facts))
 
         if verbose:
-            rmse = torch.linalg.norm(X - lambda_*dvp(facts), 'fro') / math.sqrt(X.numel())
+            rmse = torch.linalg.norm(X - lambda_*dvp(facts, device=device), 'fro') / math.sqrt(X.numel())
             print(f'Iter {i}, RMSE={rmse}')
     return lambda_, facts
