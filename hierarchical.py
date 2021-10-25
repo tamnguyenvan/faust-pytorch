@@ -61,6 +61,11 @@ def hierarchical(params):
     verbose = params.get('verbose', 0)
     update_way = params.get('update_way', 0)
     fact_side = params.get('fact_side', 0)
+    is_gpu = params.get('gpu', False)
+    if is_gpu and torch.cuda.is_available():
+        device = 'cuda'
+    else:
+        device = 'cpu'
 
     # Verify the validity of the constraints
     verif_size = params.data.size(0) == params.cons[0][0][2] and params.cons[0][0][3] \
@@ -83,7 +88,7 @@ def hierarchical(params):
     # Initialization
     lambda_ = 1
     facts = [[]] * params.n_facts
-    Res = params.data
+    Res = params.data.to(device)
     errors = torch.zeros(params.n_facts-1, 2)
 
     for k in range(0, params.n_facts-1):
@@ -91,11 +96,13 @@ def hierarchical(params):
 
         # Factorization in 2
         init_facts = [
-            torch.zeros(cons[0][2], cons[0][3]), torch.eye(cons[1][2], cons[1][3])
+            torch.zeros(cons[0][2], cons[0][3]).to(device),
+            torch.eye(cons[1][2], cons[1][3]).to(device)
         ]
         if update_way:
             init_facts = [
-                torch.eye(cons[0][2], cons[0][3]), torch.zeros(cons[1][2], cons[1][3])
+                torch.eye(cons[0][2], cons[0][3]).to(device),
+                torch.zeros(cons[1][2], cons[1][3]).to(device)
             ]
         params2 = EasyDict(
             n_iter=n_iter1,
@@ -105,7 +112,8 @@ def hierarchical(params):
             update_way=update_way,
             cons=[cons[0], cons[1]],
             init_facts=init_facts,
-            init_lambda=1
+            init_lambda=1,
+            is_gpu=is_gpu,
         )
         lambda2, facts2 = palm4msa(params2)
 
@@ -124,15 +132,15 @@ def hierarchical(params):
         params3 = EasyDict(
             n_iter=n_iter2,
             n_facts=k+2,
-            data=params.data,
+            data=params.data.to(device),
             verbose=verbose,
             update_way=update_way,
             cons=params3_cons,
             init_facts=facts[:k+2],
-            init_lambda=lambda_
+            init_lambda=lambda_,
+            is_gpu=is_gpu,
         )
         lambda_, facts3 = palm4msa(params3)
-        print('lambda', lambda_)
         facts[:k+2] = facts3
         if fact_side:
             Res = facts3[0]

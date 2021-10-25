@@ -1,3 +1,8 @@
+import os
+import sys
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 import torch
 from hierarchical import hierarchical
 from easydict import EasyDict
@@ -5,7 +10,7 @@ from utils import dvp
 
 
 X = torch.arange(100, dtype=torch.float32).view(10, 10)
-n_facts = 3
+n_facts = 10
 cons = [
     [[]] * (n_facts-1),
     [[]] * (n_facts-1)
@@ -26,5 +31,5 @@ params = EasyDict(
 
 lambda_, facts, errors = hierarchical(params)
 print('lambda', lambda_)
-print('facts', facts)
+print('facts', dvp(facts))
 print('errors', errors)

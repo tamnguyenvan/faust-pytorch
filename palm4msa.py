@@ -52,6 +52,11 @@ def palm4msa(params):
     init_lambda = params.get('init_lambda', 1)
     verbose = params.get('verbose', 0)
     update_way = params.get('update_way', 0)
+    is_gpu = params.get('is_gpu', False)
+    if is_gpu and torch.cuda.is_available():
+        device = 'cuda'
+    else:
+        device = 'cpu'
 
     if params.n_facts != len(params.init_facts):
         raise Exception('Wrong initialization: params.nfacts and params.init_facts are in conflict')
@@ -60,25 +65,28 @@ def palm4msa(params):
     for i in range(params.n_facts):
         cons = params.cons[i]
         if cons[0] == 'sp':
-            handles_cell[i] = lambda x: prox_sp(x, cons[1])
+            handles_cell[i] = lambda x: prox_sp(x, cons[1], device)
         elif cons[0] == 'spcol':
-            handles_cell[i] = lambda x: prox_spcol(x, cons[1])
+            handles_cell[i] = lambda x: prox_spcol(x, cons[1], device)
         elif cons[0] == 'splin':
-            handles_cell[i] = lambda x: prox_splin(x, cons[1])
+            handles_cell[i] = lambda x: prox_splin(x, cons[1], device)
         elif cons[0] == 'normcol':
-            handles_cell[i] = lambda x: prox_normcol(x, cons[1])
+            handles_cell[i] = lambda x: prox_normcol(x, cons[1], device)
         elif cons[0] == 'const':
             handles_cell[i] = lambda x: cons[1]
         elif cons[0] == 'sppos':
-            handles_cell[i] = lambda x: prox_sp_pos(x, cons[1])
+            handles_cell[i] = lambda x: prox_sp_pos(x, cons[1], device)
         else:
             raise Exception('The expressed type of constraint is not known')
     
     # Initialization
-    facts = params.init_facts
     lambda_ = init_lambda
+    facts = params.init_facts
+    for i, fact in enumerate(facts):
+        if torch.is_tensor(fact):
+            facts[i] = fact.to(device)
     
-    X = params.data
+    X = params.data.to(device)
     if update_way:
         maj = reversed(range(params.n_facts))
     else:
@@ -92,9 +100,9 @@ def palm4msa(params):
                 L = facts[:j]
                 R = facts[j+1:]
                 if torch.isreal(X).all():
-                    grad, LC = grad_comp(L, facts[j], R, params.data, lambda_)
+                    grad, LC = grad_comp(L, facts[j], R, params.data, lambda_, device)
                 else:
-                    grad, LC = grad_comp_cpx(L, facts[j], R, params.data, lambda_)
+                    grad, LC = grad_comp_cpx(L, facts[j], R, params.data, lambda_, device)
 
                 c = LC * 1.001
                 cons = params.cons[j]
@@ -108,6 +116,6 @@ def palm4msa(params):
         lambda_ = torch.trace(mult_right(X.T, facts)) / torch.trace(mult_right(dvp(facts).T, facts))
 
         if verbose:
-            rmse = torch.linalg.norm(X - lambda_*dvp(facts), 'fro') / math.sqrt(X.numel())
+            rmse = torch.linalg.norm(X - lambda_*dvp(facts), 'fro') / math.sqrt(X.numel()).item()
             print(f'Iter {i}, RMSE={rmse}')
     return lambda_, facts

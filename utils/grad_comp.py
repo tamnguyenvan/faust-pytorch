@@ -18,7 +18,7 @@ def norm(x, ord=2):
         return torch.linalg.norm(x, ord)
 
 
-def grad_comp(L, S, R, X, lambda_):
+def grad_comp(L, S, R, X, lambda_, device):
     """Computation of the gradient and Lipschitz modulus
 
     [grad, LC] = grad_comp(L,S,R,X,lambda) computes the gradient grad of
