@@ -90,7 +90,7 @@ def hierarchical(params):
     lambda_ = 1
     facts = [[]] * params.n_facts
     Res = params.data.to(device)
-    params.data = params.to(device)
+    params.data = params.data.to(device)
     errors = torch.zeros(params.n_facts-1, 2).to(device)
 
     for k in range(0, params.n_facts-1):
