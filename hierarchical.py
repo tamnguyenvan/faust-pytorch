@@ -3,6 +3,7 @@ import torch
 from easydict import EasyDict
 from palm4msa import palm4msa
 from utils import dvp, nnzero_count
+from utils.general import check_device, check_dtype
 
 
 def hierarchical(params):
@@ -54,6 +55,8 @@ def hierarchical(params):
     'update_way' - Way in which the factors are updated. If update_way = 1
       ,the factors are updated from right to left, and if update_way = 0,
       the factors are updated from left to right. The default value is 0.
+
+    'device' - Running device ('cuda' or 'cpu')
     """
     # Setting parameters values
     n_iter1 = params.get('n_iter1', 500)
@@ -61,13 +64,9 @@ def hierarchical(params):
     verbose = params.get('verbose', 0)
     update_way = params.get('update_way', 0)
     fact_side = params.get('fact_side', 0)
-    is_gpu = params.get('is_gpu', False)
-    if is_gpu and torch.cuda.is_available():
-        device = 'cuda'
-    else:
-        device = 'cpu'
+    device = params.get('device', 'cpu')
+    dtype = torch.float64
 
-    print('is_gpu', is_gpu)
     # Verify the validity of the constraints
     verif_size = params.data.size(0) == params.cons[0][0][2] and params.cons[0][0][3] \
         == params.cons[1][0][2] and params.data.size(1) == params.cons[1][0][3]
@@ -89,22 +88,23 @@ def hierarchical(params):
     # Initialization
     lambda_ = 1
     facts = [[]] * params.n_facts
-    Res = params.data.to(device)
-    params.data = params.data.to(device)
-    errors = torch.zeros(params.n_facts-1, 2).to(device)
+    params.data = check_device(params.data, device)
+    params.data = check_dtype(params.data, dtype)
+    Res = params.data
+    errors = torch.zeros(params.n_facts-1, 2, device=device)
 
     for k in range(0, params.n_facts-1):
         cons = [params.cons[0][k], params.cons[1][k]]
 
         # Factorization in 2
         init_facts = [
-            torch.zeros(cons[0][2], cons[0][3]).to(device),
-            torch.eye(cons[1][2], cons[1][3]).to(device)
+            torch.zeros(cons[0][2], cons[0][3], device=device),
+            torch.eye(cons[1][2], cons[1][3], device=device)
         ]
         if update_way:
             init_facts = [
-                torch.eye(cons[0][2], cons[0][3]).to(device),
-                torch.zeros(cons[1][2], cons[1][3]).to(device)
+                torch.eye(cons[0][2], cons[0][3], device=device),
+                torch.zeros(cons[1][2], cons[1][3], device=device)
             ]
         params2 = EasyDict(
             n_iter=n_iter1,
@@ -115,7 +115,7 @@ def hierarchical(params):
             cons=[cons[0], cons[1]],
             init_facts=init_facts,
             init_lambda=1,
-            is_gpu=is_gpu,
+            device=device,
         )
         lambda2, facts2 = palm4msa(params2)
 
@@ -134,13 +134,13 @@ def hierarchical(params):
         params3 = EasyDict(
             n_iter=n_iter2,
             n_facts=k+2,
-            data=params.data.to(device),
+            data=params.data,
             verbose=verbose,
             update_way=update_way,
             cons=params3_cons,
             init_facts=facts[:k+2],
             init_lambda=lambda_,
-            is_gpu=is_gpu,
+            device=device,
         )
         lambda_, facts3 = palm4msa(params3)
         facts[:k+2] = facts3
@@ -148,7 +148,7 @@ def hierarchical(params):
             Res = facts3[0]
         else:
             Res = facts3[k+1]
-        
-        errors[k, 0] = torch.linalg.norm(params.data - lambda_ * dvp(facts3, device=device)) / torch.linalg.norm(params.data)
+
+        errors[k, 0] = torch.linalg.norm(params.data - lambda_ * dvp(facts3, device)) / torch.linalg.norm(params.data)
         errors[k, 1] = nnzero_count(facts3) / params.data.numel()
     return lambda_, facts, errors

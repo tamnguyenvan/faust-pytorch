@@ -3,6 +3,7 @@ import torch
 
 from proxs import prox_sp, prox_normcol, prox_sp_pos, prox_spcol, prox_splin
 from utils import mult_right, dvp, grad_comp, grad_comp_cpx
+from utils.general import check_device, check_dtype
 
 
 def palm4msa(params):
@@ -47,16 +48,15 @@ def palm4msa(params):
     'update_way' - Way in which the factors are updated. If update_way = 1
         ,the factors are updated from right to left, and if update_way = 0,
         the factors are updated from left to right. The default value is 0.
+    
+    'device' - Running device ('cuda' or 'cpu')
     """
     # Setting optional parameters values
     init_lambda = params.get('init_lambda', 1)
     verbose = params.get('verbose', 0)
     update_way = params.get('update_way', 0)
-    is_gpu = params.get('is_gpu', False)
-    if is_gpu and torch.cuda.is_available():
-        device = 'cuda'
-    else:
-        device = 'cpu'
+    device = params.get('device', 'cpu')
+    dtype = torch.float64
 
     if params.n_facts != len(params.init_facts):
         raise Exception('Wrong initialization: params.nfacts and params.init_facts are in conflict')
@@ -83,10 +83,15 @@ def palm4msa(params):
     lambda_ = init_lambda
     facts = params.init_facts
     for i, fact in enumerate(facts):
-        if torch.is_tensor(fact):
-            facts[i] = fact.to(device)
+        if not torch.is_tensor(fact):
+            fact = torch.tensor(fact, dtype=dtype, device=device)
+        else:
+            fact = check_device(fact, device)
+            fact = check_dtype(fact, dtype)
+        facts[i] = fact
     
-    params.data = params.data.to(device)
+    params.data = check_device(params.data, device)
+    params.data = check_dtype(params.data, dtype)
     X = params.data
     if update_way:
         maj = reversed(range(params.n_facts))
@@ -114,9 +119,9 @@ def palm4msa(params):
                 else:
                     facts[j] = handles_cell[j](facts[j] - (1/c)*grad)
         
-        lambda_ = torch.trace(mult_right(X.T, facts)) / torch.trace(mult_right(dvp(facts, device=device).T, facts))
+        lambda_ = torch.trace(mult_right(X.T, facts)) / torch.trace(mult_right(dvp(facts, device).T, facts))
 
         if verbose:
-            rmse = torch.linalg.norm(X - lambda_*dvp(facts, device=device), 'fro') / math.sqrt(X.numel())
+            rmse = torch.linalg.norm(X - lambda_*dvp(facts, device), 'fro') / math.sqrt(X.numel())
             print(f'Iter {i}, RMSE={rmse}')
     return lambda_, facts
